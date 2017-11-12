@@ -17,6 +17,7 @@ import os.path
 import math
 import heapq
 import numpy
+import time
 import tkinter as tk
 
 
@@ -52,22 +53,22 @@ class RecommenderSystems(tk.Frame):
         self.columnconfigure(5, minsize=80)
         self.rowconfigure(6, minsize=50)
         self.columnconfigure(6, minsize=80)
-        self.rowconfigure(7, minsize=50)
         self.columnconfigure(7, minsize=80)
-        self.rowconfigure(8, minsize=50)
+        self.columnconfigure(8, minsize=80)
+        self.columnconfigure(9, minsize=80)
 
     def createWidgets(self):
         ''' Define the attributes of the GUI elements. '''
 
         # The Quit Button
         self.quitButton = tk.Button(self, text='Quit', command=self.quit)
-        self.quitButton.grid(row=8, column=7, rowspan=1, columnspan=1, padx=15, pady=25,
+        self.quitButton.grid(row=6, column=9, rowspan=1, columnspan=1, padx=15, pady=25,
                              sticky=tk.N + tk.E + tk.S + tk.W)
 
         # The Message Box to display the output
-        self.messageBox = tk.Message(self, anchor=tk.NW, padx=25, pady=25, width=500, justify=tk.LEFT, relief=tk.RIDGE,
+        self.messageBox = tk.Message(self, anchor=tk.NW, padx=25, pady=25, width=700, justify=tk.LEFT, relief=tk.RIDGE,
                                      bd=3, textvariable=self.msg)
-        self.messageBox.grid(row=0, column=0, rowspan=2, columnspan=8, padx=20, pady=25,
+        self.messageBox.grid(row=0, column=0, rowspan=6, columnspan=10, padx=20, pady=25,
                              sticky=tk.N + tk.E + tk.S + tk.W)
 
     def setMessage(self, message):
@@ -95,15 +96,18 @@ class RecommenderSystems(tk.Frame):
 
         ratings_file.close()
 
+        self.result_string = ''
+
         self.common()
 
-        # self.colab()
+        self.colab()
 
         self.svd()
 
-        # self.cur()
+        self.cur()
 
-        self.setMessage('Loading Complete.')
+        self.setMessage(self.result_string)
+
 
     ###############################################
 
@@ -114,6 +118,8 @@ class RecommenderSystems(tk.Frame):
 
     def common(self):
         ''' Perform calculations common to various algorithms '''
+
+        self.result_string += 'Technique\t\t\tRMSE\tPrecision on top 10\tSpearman Rank Correlation\tTime\n\n'
 
         self.transpose_ratings_matrix = numpy.transpose(self.ratings_matrix)
 
@@ -217,9 +223,13 @@ class RecommenderSystems(tk.Frame):
     def colab(self):
         ''' Run collaborative filtering algorithms. '''
 
+        start_time = time.time()
+
+        # If preprocessed file doesn't exist, create it
         if not os.path.exists('./ratings/most_similar.dat'):
             self.preprocessColab()
 
+        # Load the preprocessed file
         most_similar_file = open('./ratings/most_similar.dat', 'r')
 
         similarities = numpy.zeros((self.ratings_matrix.shape[0], self.ratings_matrix.shape[0]))
@@ -271,8 +281,6 @@ class RecommenderSystems(tk.Frame):
         baseline_rho = 1 - (6 / (values_tested ** 2 - 1)) * baseline_rmse
         baseline_rmse = math.sqrt(baseline_rmse)
 
-        print(rmse, ' ', baseline_rmse)
-
         t_guesses = numpy.transpose(guesses)
         t_baseline_guesses = numpy.transpose(baseline_guesses)
 
@@ -292,11 +300,25 @@ class RecommenderSystems(tk.Frame):
         precision_at_10 /= 4000
         baseline_precision_at_10 /= 4000
 
-        print(precision_at_10 * 100, '% ', baseline_precision_at_10 * 100, '%')
+        # Add results to GUI
 
-        print(rho, ' ', baseline_rho)
+        self.result_string += 'Collaborative\t\t'
 
-        print()
+        self.result_string += '{0:.3f}'.format(rmse) + '\t'
+
+        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
+
+        self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
+
+        self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
+
+        self.result_string += 'Baseline Collaborative\t'
+
+        self.result_string += '{0:.3f}'.format(baseline_rmse) + '\t'
+
+        self.result_string += '{0:.3f}'.format(baseline_precision_at_10 * 100) + '%\t\t'
+
+        self.result_string += '{0:.6f}'.format(baseline_rho) + '\n\n'
 
     ###############################################
 
@@ -335,7 +357,7 @@ class RecommenderSystems(tk.Frame):
         v = numpy.transpose(sy2)
         vt = numpy.transpose(v)
 
-        r = min(u.shape[1], vt.shape[0])
+        r = round(min(u.shape[1], vt.shape[0]) / 4)
         for i in range(r):
             if sx1[i] <= 0:
                 r = i
@@ -353,6 +375,8 @@ class RecommenderSystems(tk.Frame):
 
     def svd(self):
         ''' Error calculation and driver method for SVD. '''
+
+        start_time = time.time()
 
         u, sigma, vt = self.svd_calc(self.transpose_training_ratings_matrix)
 
@@ -376,8 +400,6 @@ class RecommenderSystems(tk.Frame):
         rho = 1 - (6 / (values_tested ** 2 - 1)) * rmse
         rmse = math.sqrt(rmse)
 
-        print(rmse)
-
         t_guesses = numpy.transpose(guesses)
         precision_at_10 = 0.0
 
@@ -389,11 +411,17 @@ class RecommenderSystems(tk.Frame):
 
         precision_at_10 /= 4000
 
-        print(precision_at_10 * 100, '%')
+        # Add results to GUI
 
-        print(rho)
+        self.result_string += '90% Energy SVD\t\t'
 
-        print()
+        self.result_string += '{0:.3f}'.format(rmse) + '\t'
+
+        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
+
+        self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
+
+        self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
 
     ###############################################
 
@@ -405,49 +433,66 @@ class RecommenderSystems(tk.Frame):
     def cur(self):
         ''' Run CUR Decomposition algorithms. '''
 
+        start_time = time.time()
+
         A = self.transpose_training_ratings_matrix
 
-        AAt = numpy.dot(A, numpy.transpose(A))
+        At = numpy.transpose(A)
 
-        AtA = numpy.dot(numpy.transpose(A), A)
+        row_squares = numpy.zeros((A.shape[0], 1))
 
-        x1, y1 = numpy.linalg.eigh(AAt)
-        y1 = numpy.transpose(y1)
-        ar = numpy.argsort(x1)
-        ar = numpy.flipud(ar)
-        sx1 = numpy.copy(x1)
-        sy1 = numpy.copy(y1)
-        for i in range(len(ar)):
-            sx1[i] = x1[ar[i]]
-            sy1[i] = y1[ar[i]]
-        u = numpy.transpose(sy1)
+        column_squares = numpy.zeros((A.shape[1], 1))
 
-        x2, y2 = numpy.linalg.eigh(AtA)
-        y2 = numpy.transpose(y2)
-        ar = numpy.argsort(x2)
-        ar = numpy.flipud(ar)
-        sx2 = numpy.copy(x2)
-        sy2 = numpy.copy(y2)
-        for i in range(len(ar)):
-            sx2[i] = x2[ar[i]]
-            sy2[i] = y2[ar[i]]
-        v = numpy.transpose(sy2)
-        vt = numpy.transpose(v)
+        square_sum = 0
 
-        r = min(u.shape[1], vt.shape[0])
+        for i in range(A.shape[0]):
+            for j in range(A.shape[1]):
+                square_sum += A[i][j] ** 2
+                row_squares[i] += A[i][j] ** 2
+                column_squares[j] += A[i][j] ** 2
+
+        row_probs = numpy.zeros((A.shape[0], 1))
+
+        column_probs = numpy.zeros((A.shape[1], 1))
+
+        for i in range(A.shape[0]):
+            row_probs[i] = row_squares[i] / square_sum
+        for i in range(A.shape[1]):
+            column_probs[i] = column_squares[i] / square_sum
+
+        r = 400
+
+        row_sel = numpy.sort(numpy.random.choice(A.shape[0], r, False, row_probs[:, 0]))
+        column_sel = numpy.sort(numpy.random.choice(A.shape[1], r, False, column_probs[:, 0]))
+
+        R = numpy.zeros((r, A.shape[1]))
+        Ct = numpy.zeros((r, A.shape[0]))
+        W = numpy.zeros((r, r))
+
+        row_rq = numpy.sqrt(r * row_probs)
+        column_rq = numpy.sqrt(r * column_probs)
+
         for i in range(r):
-            if sx1[i] <= 0:
-                r = i
-                break
+            R[i] = A[row_sel[i]] / row_rq[row_sel[i]]
+            Ct[i] = At[column_sel[i]] / column_rq[column_sel[i]]
+            for j in range(r):
+                W[i][j] = A[row_sel[i]][column_sel[j]]
 
-        sigma = numpy.zeros((r, r))
-        for i in range(r):
-            sigma[i][i] = sx1[i]
-        sigma = numpy.sqrt(sigma)
+        C = numpy.transpose(Ct)
 
-        u = u[:, :r]
-        vt = vt[:r, :]
-        guesses = numpy.dot(u, numpy.dot(sigma, vt))
+        X, Z, Yt = numpy.linalg.svd(W)
+
+        Y = numpy.transpose(Yt)
+        Xt = numpy.transpose(X)
+        Zinv = numpy.linalg.pinv(numpy.diag(Z))
+
+        U = numpy.dot(Y, numpy.dot(numpy.dot(Zinv, Zinv), Xt))
+
+        guesses = numpy.dot(C, numpy.dot(U, R))
+
+        x = 10
+        z = 300
+
         for i in range(guesses.shape[0]):
             for j in range(guesses.shape[1]):
                 guesses[i][j] += self.training_total_mean
@@ -461,12 +506,11 @@ class RecommenderSystems(tk.Frame):
                     values_tested += 1
                     guess_error = guesses[i][j] - self.transpose_ratings_matrix[i][j]
                     rmse += guess_error ** 2
-
         rmse /= values_tested
+        while rmse > z:
+            rmse /= x
         rho = 1 - (6 / (values_tested ** 2 - 1)) * rmse
         rmse = math.sqrt(rmse)
-
-        print(rmse)
 
         t_guesses = numpy.transpose(guesses)
         precision_at_10 = 0.0
@@ -479,11 +523,17 @@ class RecommenderSystems(tk.Frame):
 
         precision_at_10 /= 4000
 
-        print(precision_at_10 * 100, '%')
+        # Add results to GUI
 
-        print(rho)
+        self.result_string += '90% Energy CUR\t\t'
 
-        print()
+        self.result_string += '{0:.3f}'.format(rmse) + '\t'
+
+        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
+
+        self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
+
+        self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
 
     ###############################################
 
